@@ -1,0 +1,15 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head><meta charset="UTF-8"><title>YouTube Info</title></head>
+<body>
+  <h2>YouTube動画情報</h2>
+  <form method="post">
+    <input type="text" name="url" placeholder="YouTube URLまたはID" size="50">
+    <button type="submit">取得</button>
+  </form>
+  {% if title %}
+    <h3>タイトル: {{ title }}</h3>
+    <img src="{{ thumb_url }}" alt="Thumbnail" style="max-width:480px;">
+  {% endif %}
+</body>
+</html>
