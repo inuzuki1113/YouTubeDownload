@@ -1,84 +1,49 @@
-from flask import Flask, request, render_template_string
-import os
-import requests
+from flask import Flask, render_template, request
+import os, re, requests
 
 app = Flask(__name__)
 
-# ✅ APIキーは環境変数から取得（RenderならDashboard→Environmentで設定）
-YOUTUBE_API_KEY = os.getenv("YOUTUBE_API_KEY")
-
-HTML = """
-<!DOCTYPE html>
-<html lang="ja">
-<head>
-<meta charset="UTF-8">
-<title>YouTube 情報取得</title>
-</head>
-<body>
-<h2>YouTube 動画情報（公式API利用）</h2>
-<form method="post">
-  <input type="text" name="url" size="50" placeholder="YouTube URLまたは動画ID">
-  <button type="submit">取得</button>
-</form>
-
-{% if video %}
-  <h3>✅ 取得結果</h3>
-  <p>タイトル: {{ video.title }}</p>
-  <p>チャンネル: {{ video.channel }}</p>
-  <p>再生数: {{ video.views }}</p>
-  <p>公開日: {{ video.published }}</p>
-  <p><a href="https://www.youtube.com/watch?v={{ video.id }}" target="_blank">YouTubeで見る</a></p>
-{% elif error %}
-  <p style="color:red;">⚠️ {{ error }}</p>
-{% endif %}
-</body>
-</html>
-"""
+# ✅ 環境変数から取得（ローカルなら直接文字列でもOK）
+API_KEY = os.getenv("YOUTUBE_API_KEY", "ここにローカル用のキー")
 
 def extract_video_id(url_or_id: str) -> str:
-    """
-    YouTube URL か ID が渡されても動画IDだけ抽出する。
-    """
-    if "youtube.com" in url_or_id or "youtu.be" in url_or_id:
-        import re
-        match = re.search(r"(?:v=|\/)([0-9A-Za-z_-]{11})", url_or_id)
-        return match.group(1) if match else None
-    return url_or_id.strip()
+    """URLまたはIDから動画IDだけを抽出"""
+    # すでにIDだけならそのまま返す
+    if re.fullmatch(r"[0-9A-Za-z_-]{11}", url_or_id):
+        return url_or_id
+    # URLからID抽出
+    patterns = [
+        r"v=([0-9A-Za-z_-]{11})",
+        r"youtu\.be/([0-9A-Za-z_-]{11})",
+        r"shorts/([0-9A-Za-z_-]{11})"
+    ]
+    for p in patterns:
+        m = re.search(p, url_or_id)
+        if m:
+            return m.group(1)
+    return ""
 
 @app.route("/", methods=["GET", "POST"])
 def index():
-    video = None
-    error = None
+    title = thumb_url = None
     if request.method == "POST":
-        url = request.form["url"].strip()
-        vid = extract_video_id(url)
-        if not vid:
-            error = "動画IDを抽出できませんでした。"
-        elif not YOUTUBE_API_KEY:
-            error = "サーバーにAPIキーが設定されていません。"
-        else:
+        input_text = request.form["url"].strip()
+        video_id = extract_video_id(input_text)
+        if video_id:
             api_url = (
-                f"https://www.googleapis.com/youtube/v3/videos"
-                f"?part=snippet,statistics&id={vid}&key={YOUTUBE_API_KEY}"
+                "https://www.googleapis.com/youtube/v3/videos"
+                f"?id={video_id}&key={API_KEY}&part=snippet"
             )
             r = requests.get(api_url)
-            data = r.json()
-            if "items" in data and data["items"]:
-                item = data["items"][0]
-                snippet = item["snippet"]
-                stats = item.get("statistics", {})
-                video = type("V", (), {
-                    "id": vid,
-                    "title": snippet["title"],
-                    "channel": snippet["channelTitle"],
-                    "views": stats.get("viewCount", "N/A"),
-                    "published": snippet["publishedAt"]
-                })
-            else:
-                error = "動画が見つかりません。APIキーやIDを確認してください。"
-    return render_template_string(HTML, video=video, error=error)
+            if r.ok:
+                data = r.json()
+                if data["items"]:
+                    snippet = data["items"][0]["snippet"]
+                    title = snippet["title"]
+                    # 高解像度優先
+                    thumb_url = snippet["thumbnails"].get("maxres",
+                                snippet["thumbnails"]["high"])["url"]
+    return render_template("index.html", title=title, thumb_url=thumb_url)
 
 if __name__ == "__main__":
-    # Renderで動かす場合は host/port は環境変数PORTに合わせる
-    port = int(os.environ.get("PORT", 5000))
-    app.run(host="0.0.0.0", port=port)
+    app.run(host="0.0.0.0", port=5000, debug=True)
