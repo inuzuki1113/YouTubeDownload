@@ -1,15 +1,36 @@
 <!DOCTYPE html>
 <html lang="ja">
-<head><meta charset="UTF-8"><title>YouTube Info</title></head>
+<head>
+<meta charset="UTF-8">
+<title>YouTube Downloader</title>
+<style>
+body { font-family: sans-serif; text-align: center; margin: 40px; }
+input[type=text] { width: 60%; padding: 10px; }
+button { padding: 10px 20px; }
+.thumbnail { margin: 20px auto; }
+</style>
+</head>
 <body>
-  <h2>YouTube動画情報</h2>
-  <form method="post">
-    <input type="text" name="url" placeholder="YouTube URLまたはID" size="50">
-    <button type="submit">取得</button>
-  </form>
-  {% if title %}
-    <h3>タイトル: {{ title }}</h3>
-    <img src="{{ thumb_url }}" alt="Thumbnail" style="max-width:480px;">
-  {% endif %}
+<h1>YouTube Downloader</h1>
+
+<form method="post">
+  <input type="text" name="url" placeholder="YouTube URL を入力" required>
+  <button type="submit">情報取得</button>
+</form>
+
+{% if error %}
+<p style="color:red;">{{ error }}</p>
+{% endif %}
+
+{% if info %}
+<div class="thumbnail">
+  <img src="{{ info.thumbnail }}" width="480"><br>
+  <h2>{{ info.title }}</h2>
+</div>
+<form method="post" action="/download">
+  <input type="hidden" name="url" value="{{ url }}">
+  <button type="submit">動画をダウンロード</button>
+</form>
+{% endif %}
 </body>
 </html>
